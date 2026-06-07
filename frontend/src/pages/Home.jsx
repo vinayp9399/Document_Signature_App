@@ -19,10 +19,16 @@ function Home() {
         <p className="text-lg text-gray-600 mb-8">Document Signature App</p>
 
         {user ? (
-          <div className="bg-white rounded-lg shadow p-6 max-w-md mx-auto text-left">
-            <p className="text-gray-700 mb-4">
+          <div className="bg-white rounded-lg shadow p-6 max-w-md mx-auto text-left space-y-3">
+            <p className="text-gray-700">
               Welcome, <span className="font-semibold">{user.name}</span>!
             </p>
+            <Link
+              to="/dashboard"
+              className="block w-full text-center bg-blue-600 text-white py-2 rounded-md text-sm font-medium hover:bg-blue-700 transition"
+            >
+              Go to Dashboard
+            </Link>
             <button
               onClick={handleLogout}
               className="w-full bg-red-500 text-white py-2 rounded-md text-sm font-medium hover:bg-red-600 transition"

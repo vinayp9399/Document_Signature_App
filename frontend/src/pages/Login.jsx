@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, useNavigate } from 'react-router-dom';
-import api from '../utils/api';
+import axios from 'axios';
 
 function Login() {
   const { register, handleSubmit, formState: { errors } } = useForm();
@@ -13,7 +13,7 @@ function Login() {
     setServerError('');
     setLoading(true);
     try {
-      const res = await api.post('/auth/login', data);
+      const res = await axios.post('http://localhost:5000/api/auth/login', data);
       localStorage.setItem('token', res.data.token);
       localStorage.setItem('refreshToken', res.data.refreshToken);
       localStorage.setItem('user', JSON.stringify(res.data.user));
@@ -31,9 +31,7 @@ function Login() {
         <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">Welcome Back</h2>
 
         {serverError && (
-          <div className="bg-red-50 text-red-700 p-3 rounded mb-4 text-sm">
-            {serverError}
-          </div>
+          <div className="bg-red-50 text-red-700 p-3 rounded mb-4 text-sm">{serverError}</div>
         )}
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -73,9 +71,7 @@ function Login() {
 
         <p className="mt-4 text-center text-sm text-gray-600">
           Don't have an account?{' '}
-          <Link to="/register" className="text-blue-600 hover:underline font-medium">
-            Register
-          </Link>
+          <Link to="/register" className="text-blue-600 hover:underline font-medium">Register</Link>
         </p>
       </div>
     </div>
