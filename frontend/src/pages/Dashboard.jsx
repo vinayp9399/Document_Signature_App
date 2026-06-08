@@ -75,7 +75,7 @@ function Dashboard() {
         </div>
       </nav>
 
-      <div className="max-w-4xl mx-auto mt-10 px-4">
+      <div className="max-w-5xl mx-auto mt-10 px-4">
         <h2 className="text-2xl font-bold text-gray-900 mb-6">My Documents</h2>
 
         {error && (
@@ -103,6 +103,7 @@ function Dashboard() {
                   <th className="text-left px-6 py-3 text-gray-600 font-medium">Size</th>
                   <th className="text-left px-6 py-3 text-gray-600 font-medium">Status</th>
                   <th className="text-left px-6 py-3 text-gray-600 font-medium">Uploaded</th>
+                  <th className="text-left px-6 py-3 text-gray-600 font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -122,6 +123,14 @@ function Dashboard() {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-gray-500">{formatDate(doc.created_at)}</td>
+                    <td className="px-6 py-4">
+                      <Link
+                        to={`/docs/${doc.id}`}
+                        className="text-blue-600 hover:underline text-sm font-medium"
+                      >
+                        Preview
+                      </Link>
+                    </td>
                   </tr>
                 ))}
               </tbody>
