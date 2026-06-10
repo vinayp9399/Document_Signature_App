@@ -1,10 +1,19 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Document, Page, pdfjs } from 'react-pdf';
+import {
+  DndContext,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
 import axios from 'axios';
 
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
+
+import DraggableSignature from '../components/DraggableSignature';
+import SignatureToolbar from '../components/SignatureToolbar';
 
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
@@ -13,7 +22,7 @@ const PAGE_WIDTH = 600;
 function DocumentView() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const pageRef = useRef(null);
+  const dropZoneRef = useRef(null);
 
   const [doc, setDoc] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -21,8 +30,10 @@ function DocumentView() {
   const [numPages, setNumPages] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [signatures, setSignatures] = useState([]);
-  const [savingSignature, setSavingSignature] = useState(false);
   const [sigMsg, setSigMsg] = useState('');
+  const [isDropping, setIsDropping] = useState(false);
+
+  const sensors = useSensors(useSensor(PointerSensor));
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -76,14 +87,55 @@ function DocumentView() {
   const goToPrevPage = () => setCurrentPage((prev) => Math.max(prev - 1, 1));
   const goToNextPage = () => setCurrentPage((prev) => Math.min(prev + 1, numPages));
 
-  const handlePageClick = async (e) => {
-    if (!pageRef.current) return;
-    const rect = pageRef.current.getBoundingClientRect();
-    const x = parseFloat(((e.clientX - rect.left) / rect.width * 100).toFixed(2));
-    const y = parseFloat(((e.clientY - rect.top) / rect.height * 100).toFixed(2));
+  const handleDragEnd = async (event) => {
+    const { active, delta } = event;
+    if (!dropZoneRef.current) return;
 
+    const rect = dropZoneRef.current.getBoundingClientRect();
+
+    // If dragging a new signature field from the toolbar
+    if (active.id === 'new-signature-field') {
+      // Get the pointer position at drag end relative to the drop zone
+      const pointerX = event.activatorEvent.clientX + delta.x;
+      const pointerY = event.activatorEvent.clientY + delta.y;
+
+      // Check if dropped inside the PDF drop zone
+      if (
+        pointerX < rect.left ||
+        pointerX > rect.right ||
+        pointerY < rect.top ||
+        pointerY > rect.bottom
+      ) {
+        return; // Dropped outside the PDF area
+      }
+
+      const x = parseFloat(((pointerX - rect.left) / rect.width * 100).toFixed(2));
+      const y = parseFloat(((pointerY - rect.top) / rect.height * 100).toFixed(2));
+
+      await saveSignature(x, y);
+      return;
+    }
+
+    // If dragging an existing signature to reposition
+    const existingSig = signatures.find((s) => String(s.id) === String(active.id));
+    if (existingSig) {
+      const deltaXPercent = parseFloat(((delta.x / rect.width) * 100).toFixed(2));
+      const deltaYPercent = parseFloat(((delta.y / rect.height) * 100).toFixed(2));
+
+      const newX = Math.min(100, Math.max(0, existingSig.x + deltaXPercent));
+      const newY = Math.min(100, Math.max(0, existingSig.y + deltaYPercent));
+
+      setSignatures((prev) =>
+        prev.map((s) =>
+          String(s.id) === String(active.id) ? { ...s, x: newX, y: newY } : s
+        )
+      );
+    }
+  };
+
+  const saveSignature = async (x, y) => {
     const token = localStorage.getItem('token');
-    setSavingSignature(true);
+    setIsDropping(true);
     setSigMsg('');
 
     try {
@@ -93,17 +145,15 @@ function DocumentView() {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setSignatures((prev) => [...prev, res.data.signature]);
-      setSigMsg('Signature placeholder placed!');
+      setSigMsg('Signature field placed successfully!');
     } catch (err) {
       setSigMsg('Failed to save signature position.');
     } finally {
-      setSavingSignature(false);
+      setIsDropping(false);
     }
   };
 
-  const currentPageSignatures = signatures.filter(
-    (s) => s.page === currentPage
-  );
+  const currentPageSignatures = signatures.filter((s) => s.page === currentPage);
 
   if (loading) {
     return (
@@ -131,14 +181,16 @@ function DocumentView() {
         <Link to="/dashboard" className="text-sm text-blue-600 hover:underline">← Back to Dashboard</Link>
       </nav>
 
-      <div className="max-w-4xl mx-auto mt-8 px-4">
+      <div className="max-w-5xl mx-auto mt-8 px-4">
         {/* Document info */}
         <div className="bg-white rounded-lg shadow p-5 mb-6 flex items-center justify-between">
           <div>
             <h2 className="text-lg font-bold text-gray-900">{doc.original_name}</h2>
             <p className="text-sm text-gray-500 mt-1">
               Size: {doc.file_size ? (doc.file_size / 1024).toFixed(1) + ' KB' : 'N/A'} &nbsp;•&nbsp;
-              Uploaded: {new Date(doc.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+              Uploaded: {new Date(doc.created_at).toLocaleDateString('en-US', {
+                year: 'numeric', month: 'short', day: 'numeric',
+              })}
             </p>
           </div>
           <span className={`px-3 py-1 rounded-full text-xs font-medium ${
@@ -152,11 +204,6 @@ function DocumentView() {
           </span>
         </div>
 
-        {/* Signature instruction */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 mb-4 text-sm text-blue-700">
-          💡 Click anywhere on the PDF below to place a signature placeholder.
-        </div>
-
         {sigMsg && (
           <div className={`text-sm px-4 py-2 rounded mb-4 ${
             sigMsg.includes('Failed') ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'
@@ -165,87 +212,92 @@ function DocumentView() {
           </div>
         )}
 
-        {/* PDF Viewer */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-gray-700">
-              Document Preview
-              {currentPageSignatures.length > 0 && (
-                <span className="ml-2 text-xs text-blue-600 font-normal">
-                  ({currentPageSignatures.length} signature{currentPageSignatures.length > 1 ? 's' : ''} on this page)
-                </span>
-              )}
-            </h3>
-            {numPages && (
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={goToPrevPage}
-                  disabled={currentPage <= 1}
-                  className="px-3 py-1 text-xs bg-gray-100 rounded hover:bg-gray-200 disabled:opacity-40 transition"
-                >
-                  ← Prev
-                </button>
-                <span className="text-xs text-gray-600">Page {currentPage} of {numPages}</span>
-                <button
-                  onClick={goToNextPage}
-                  disabled={currentPage >= numPages}
-                  className="px-3 py-1 text-xs bg-gray-100 rounded hover:bg-gray-200 disabled:opacity-40 transition"
-                >
-                  Next →
-                </button>
-              </div>
-            )}
-          </div>
+        {/* DnD Editor area */}
+        <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+          <div className="flex gap-4 items-start">
 
-          {/* PDF + signature overlay wrapper */}
-          <div className="flex justify-center">
-            <div
-              ref={pageRef}
-              onClick={handlePageClick}
-              className="relative cursor-crosshair border rounded-md overflow-hidden bg-gray-100"
-              style={{ width: PAGE_WIDTH }}
-            >
-              <Document
-                file={pdfUrl}
-                onLoadSuccess={onDocumentLoadSuccess}
-                onLoadError={() => setError('Failed to render PDF preview.')}
-                loading={<p className="text-sm text-gray-500 p-10 text-center">Loading PDF...</p>}
-              >
-                <Page
-                  pageNumber={currentPage}
-                  width={PAGE_WIDTH}
-                  renderAnnotationLayer={true}
-                  renderTextLayer={true}
-                />
-              </Document>
+            {/* Toolbar */}
+            <SignatureToolbar />
 
-              {/* Render signature placeholders on current page */}
-              {currentPageSignatures.map((sig) => (
+            {/* PDF + drop zone */}
+            <div className="flex-1">
+              <div className="bg-white rounded-lg shadow p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-xs text-gray-500">
+                    Drag a signature field from the left panel onto the document.
+                    {currentPageSignatures.length > 0 && (
+                      <span className="ml-2 text-blue-600">
+                        ({currentPageSignatures.length} field{currentPageSignatures.length > 1 ? 's' : ''} on this page)
+                      </span>
+                    )}
+                  </p>
+                  {numPages && (
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={goToPrevPage}
+                        disabled={currentPage <= 1}
+                        className="px-3 py-1 text-xs bg-gray-100 rounded hover:bg-gray-200 disabled:opacity-40 transition"
+                      >
+                        ← Prev
+                      </button>
+                      <span className="text-xs text-gray-600">Page {currentPage} of {numPages}</span>
+                      <button
+                        onClick={goToNextPage}
+                        disabled={currentPage >= numPages}
+                        className="px-3 py-1 text-xs bg-gray-100 rounded hover:bg-gray-200 disabled:opacity-40 transition"
+                      >
+                        Next →
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Drop zone over PDF */}
                 <div
-                  key={sig.id}
-                  onClick={(e) => e.stopPropagation()}
-                  style={{
-                    position: 'absolute',
-                    left: `${sig.x}%`,
-                    top: `${sig.y}%`,
-                    transform: 'translate(-50%, -50%)',
-                  }}
-                  className="bg-yellow-200 border-2 border-yellow-500 rounded px-2 py-1 text-xs text-yellow-800 font-medium shadow pointer-events-none select-none"
+                  ref={dropZoneRef}
+                  className="relative border-2 border-dashed border-gray-200 rounded-md overflow-hidden bg-gray-50"
+                  style={{ width: PAGE_WIDTH }}
                 >
-                  ✍️ {sig.signer_name || 'Signature'}
-                </div>
-              ))}
+                  <Document
+                    file={pdfUrl}
+                    onLoadSuccess={onDocumentLoadSuccess}
+                    onLoadError={() => setError('Failed to render PDF preview.')}
+                    loading={
+                      <p className="text-sm text-gray-500 p-10 text-center">Loading PDF...</p>
+                    }
+                  >
+                    <Page
+                      pageNumber={currentPage}
+                      width={PAGE_WIDTH}
+                      renderAnnotationLayer={true}
+                      renderTextLayer={true}
+                    />
+                  </Document>
 
-              {savingSignature && (
-                <div className="absolute inset-0 bg-white bg-opacity-40 flex items-center justify-center">
-                  <span className="text-xs text-gray-600">Saving...</span>
+                  {/* Render existing signature fields on this page */}
+                  {currentPageSignatures.map((sig) => (
+                    <DraggableSignature
+                      key={sig.id}
+                      id={sig.id}
+                      x={sig.x}
+                      y={sig.y}
+                      signerName={sig.signer_name}
+                      status={sig.status}
+                    />
+                  ))}
+
+                  {isDropping && (
+                    <div className="absolute inset-0 bg-white bg-opacity-50 flex items-center justify-center">
+                      <span className="text-xs text-gray-500">Saving...</span>
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
             </div>
           </div>
-        </div>
+        </DndContext>
 
-        {/* Signatures list */}
+        {/* Signatures table */}
         {signatures.length > 0 && (
           <div className="bg-white rounded-lg shadow p-5 mt-6">
             <h3 className="text-sm font-semibold text-gray-700 mb-3">Placed Signature Fields</h3>
