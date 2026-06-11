@@ -1,11 +1,15 @@
 const express = require('express');
 const router = express.Router();
-const path = require('path');
 const authMiddleware = require('../middleware/authMiddleware');
 const upload = require('../config/multer');
 const Document = require('../models/Document');
 
-router.post('/upload', authMiddleware, upload.single('pdf'), async (req, res) => {
+router.post('/upload', authMiddleware, (req, res, next) => {
+  upload.single('pdf')(req, res, (err) => {
+    if (err) return next(err); // Pass multer errors to global handler
+    next();
+  });
+}, async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ message: 'No file uploaded or file is not a PDF' });
@@ -45,7 +49,6 @@ router.get('/:id', authMiddleware, async (req, res) => {
     if (!doc) {
       return res.status(404).json({ message: 'Document not found' });
     }
-
     if (doc.user_id !== req.userId) {
       return res.status(403).json({ message: 'Access denied' });
     }

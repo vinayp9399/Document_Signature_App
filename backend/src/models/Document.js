@@ -24,7 +24,15 @@ const Document = {
       `SELECT * FROM documents WHERE id = $1`,
       [id]
     );
-    return result.rows[0];
+    return result.rows[0] || null;
+  },
+
+  async updateStatus(id, status) {
+    const result = await pool.query(
+      `UPDATE documents SET status = $1 WHERE id = $2 RETURNING *`,
+      [status, id]
+    );
+    return result.rows[0] || null;
   },
 };
 

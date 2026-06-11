@@ -38,14 +38,14 @@ router.post('/register', async (req, res) => {
       message: 'User registered successfully',
       token,
       refreshToken,
-      user: {
-        id: newUser.id,
-        name: newUser.name,
-        email: newUser.email,
-      },
+      user: { id: newUser.id, name: newUser.name, email: newUser.email },
     });
   } catch (err) {
     console.error('Register error:', err);
+    // Handle PostgreSQL unique constraint violation
+    if (err.code === '23505') {
+      return res.status(400).json({ message: 'User already exists with this email' });
+    }
     res.status(500).json({ message: 'Server error during registration' });
   }
 });
@@ -84,11 +84,7 @@ router.post('/login', async (req, res) => {
       message: 'Login successful',
       token,
       refreshToken,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-      },
+      user: { id: user.id, name: user.name, email: user.email },
     });
   } catch (err) {
     console.error('Login error:', err);
