@@ -32,6 +32,9 @@ function DocumentView() {
   const [signatures, setSignatures] = useState([]);
   const [sigMsg, setSigMsg] = useState('');
   const [isDropping, setIsDropping] = useState(false);
+  const [finalizing, setFinalizing] = useState(false);
+  const [finalizeMsg, setFinalizeMsg] = useState('');
+  const [downloadUrl, setDownloadUrl] = useState('');
 
   const sensors = useSensors(useSensor(PointerSensor));
 
@@ -93,21 +96,16 @@ function DocumentView() {
 
     const rect = dropZoneRef.current.getBoundingClientRect();
 
-    // If dragging a new signature field from the toolbar
     if (active.id === 'new-signature-field') {
-      // Get the pointer position at drag end relative to the drop zone
       const pointerX = event.activatorEvent.clientX + delta.x;
       const pointerY = event.activatorEvent.clientY + delta.y;
 
-      // Check if dropped inside the PDF drop zone
       if (
         pointerX < rect.left ||
         pointerX > rect.right ||
         pointerY < rect.top ||
         pointerY > rect.bottom
-      ) {
-        return; // Dropped outside the PDF area
-      }
+      ) return;
 
       const x = parseFloat(((pointerX - rect.left) / rect.width * 100).toFixed(2));
       const y = parseFloat(((pointerY - rect.top) / rect.height * 100).toFixed(2));
@@ -116,19 +114,14 @@ function DocumentView() {
       return;
     }
 
-    // If dragging an existing signature to reposition
     const existingSig = signatures.find((s) => String(s.id) === String(active.id));
     if (existingSig) {
       const deltaXPercent = parseFloat(((delta.x / rect.width) * 100).toFixed(2));
       const deltaYPercent = parseFloat(((delta.y / rect.height) * 100).toFixed(2));
-
       const newX = Math.min(100, Math.max(0, existingSig.x + deltaXPercent));
       const newY = Math.min(100, Math.max(0, existingSig.y + deltaYPercent));
-
       setSignatures((prev) =>
-        prev.map((s) =>
-          String(s.id) === String(active.id) ? { ...s, x: newX, y: newY } : s
-        )
+        prev.map((s) => String(s.id) === String(active.id) ? { ...s, x: newX, y: newY } : s)
       );
     }
   };
@@ -137,7 +130,6 @@ function DocumentView() {
     const token = localStorage.getItem('token');
     setIsDropping(true);
     setSigMsg('');
-
     try {
       const res = await axios.post(
         'http://localhost:5000/api/signatures',
@@ -150,6 +142,36 @@ function DocumentView() {
       setSigMsg('Failed to save signature position.');
     } finally {
       setIsDropping(false);
+    }
+  };
+
+  const handleFinalize = async () => {
+    const token = localStorage.getItem('token');
+    setFinalizing(true);
+    setFinalizeMsg('');
+    setDownloadUrl('');
+    try {
+      const res = await axios.post(
+        'http://localhost:5000/api/signatures/finalize',
+        { documentId: parseInt(id) },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setFinalizeMsg('PDF signed successfully!');
+      setDownloadUrl(`http://localhost:5000${res.data.downloadUrl}`);
+      // Refresh doc status
+      const docRes = await axios.get(`http://localhost:5000/api/docs/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setDoc(docRes.data.document);
+      // Refresh signatures
+      const sigRes = await axios.get(`http://localhost:5000/api/signatures/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setSignatures(sigRes.data.signatures);
+    } catch (err) {
+      setFinalizeMsg(err.response?.data?.message || 'Failed to finalize PDF.');
+    } finally {
+      setFinalizing(false);
     }
   };
 
@@ -193,38 +215,66 @@ function DocumentView() {
               })}
             </p>
           </div>
-          <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-            doc.status === 'signed'
-              ? 'bg-green-100 text-green-700'
-              : doc.status === 'rejected'
-              ? 'bg-red-100 text-red-700'
-              : 'bg-yellow-100 text-yellow-700'
-          }`}>
-            {doc.status.charAt(0).toUpperCase() + doc.status.slice(1)}
-          </span>
+          <div className="flex items-center gap-3">
+            <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+              doc.status === 'signed'
+                ? 'bg-green-100 text-green-700'
+                : doc.status === 'rejected'
+                ? 'bg-red-100 text-red-700'
+                : 'bg-yellow-100 text-yellow-700'
+            }`}>
+              {doc.status.charAt(0).toUpperCase() + doc.status.slice(1)}
+            </span>
+            {doc.status !== 'signed' && signatures.length > 0 && (
+              <button
+                onClick={handleFinalize}
+                disabled={finalizing}
+                className="bg-green-600 text-white px-4 py-1.5 rounded-md text-sm font-medium hover:bg-green-700 disabled:opacity-50 transition"
+              >
+                {finalizing ? 'Generating...' : '✅ Finalize & Sign PDF'}
+              </button>
+            )}
+          </div>
         </div>
+
+        {/* Finalize feedback */}
+        {finalizeMsg && (
+          <div className={`text-sm px-4 py-3 rounded mb-4 flex items-center justify-between ${
+            finalizeMsg.includes('Failed') || finalizeMsg.includes('No signatures')
+              ? 'bg-red-50 text-red-700'
+              : 'bg-green-50 text-green-700'
+          }`}>
+            <span>{finalizeMsg}</span>
+            {downloadUrl && (
+              <a
+                href={downloadUrl}
+                download
+                className="ml-4 bg-green-600 text-white px-3 py-1 rounded text-xs font-medium hover:bg-green-700 transition"
+              >
+                ⬇ Download Signed PDF
+              </a>
+            )}
+          </div>
+        )}
 
         {sigMsg && (
           <div className={`text-sm px-4 py-2 rounded mb-4 ${
-            sigMsg.includes('Failed') ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'
+            sigMsg.includes('Failed') ? 'bg-red-50 text-red-700' : 'bg-blue-50 text-blue-700'
           }`}>
             {sigMsg}
           </div>
         )}
 
-        {/* DnD Editor area */}
+        {/* DnD Editor */}
         <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
           <div className="flex gap-4 items-start">
-
-            {/* Toolbar */}
             <SignatureToolbar />
 
-            {/* PDF + drop zone */}
             <div className="flex-1">
               <div className="bg-white rounded-lg shadow p-4">
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-xs text-gray-500">
-                    Drag a signature field from the left panel onto the document.
+                    Drag a signature field from the left onto the document.
                     {currentPageSignatures.length > 0 && (
                       <span className="ml-2 text-blue-600">
                         ({currentPageSignatures.length} field{currentPageSignatures.length > 1 ? 's' : ''} on this page)
@@ -252,7 +302,6 @@ function DocumentView() {
                   )}
                 </div>
 
-                {/* Drop zone over PDF */}
                 <div
                   ref={dropZoneRef}
                   className="relative border-2 border-dashed border-gray-200 rounded-md overflow-hidden bg-gray-50"
@@ -262,9 +311,7 @@ function DocumentView() {
                     file={pdfUrl}
                     onLoadSuccess={onDocumentLoadSuccess}
                     onLoadError={() => setError('Failed to render PDF preview.')}
-                    loading={
-                      <p className="text-sm text-gray-500 p-10 text-center">Loading PDF...</p>
-                    }
+                    loading={<p className="text-sm text-gray-500 p-10 text-center">Loading PDF...</p>}
                   >
                     <Page
                       pageNumber={currentPage}
@@ -274,7 +321,6 @@ function DocumentView() {
                     />
                   </Document>
 
-                  {/* Render existing signature fields on this page */}
                   {currentPageSignatures.map((sig) => (
                     <DraggableSignature
                       key={sig.id}
