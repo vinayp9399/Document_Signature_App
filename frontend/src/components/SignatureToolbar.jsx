@@ -26,7 +26,7 @@ function SignatureToolbar() {
         {...attributes}
         className="bg-yellow-100 border-2 border-dashed border-yellow-400 rounded px-3 py-2 text-xs font-medium text-yellow-800 text-center select-none"
       >
-       Signature Field
+      Signature Field
       </div>
     </div>
   );

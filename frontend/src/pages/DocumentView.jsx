@@ -36,14 +36,20 @@ function DocumentView() {
   const [finalizeMsg, setFinalizeMsg] = useState('');
   const [downloadUrl, setDownloadUrl] = useState('');
 
+  // Share link state
+  const [showSharePanel, setShowSharePanel] = useState(false);
+  const [signerEmail, setSignerEmail] = useState('');
+  const [signerName, setSignerName] = useState('');
+  const [sendingLink, setSendingLink] = useState(false);
+  const [shareMsg, setShareMsg] = useState('');
+  const [generatedLink, setGeneratedLink] = useState('');
+  const [linkCopied, setLinkCopied] = useState(false);
+
   const sensors = useSensors(useSensor(PointerSensor));
 
   useEffect(() => {
     const token = localStorage.getItem('token');
-    if (!token) {
-      navigate('/login');
-      return;
-    }
+    if (!token) { navigate('/login'); return; }
 
     const fetchDocument = async () => {
       try {
@@ -93,23 +99,14 @@ function DocumentView() {
   const handleDragEnd = async (event) => {
     const { active, delta } = event;
     if (!dropZoneRef.current) return;
-
     const rect = dropZoneRef.current.getBoundingClientRect();
 
     if (active.id === 'new-signature-field') {
       const pointerX = event.activatorEvent.clientX + delta.x;
       const pointerY = event.activatorEvent.clientY + delta.y;
-
-      if (
-        pointerX < rect.left ||
-        pointerX > rect.right ||
-        pointerY < rect.top ||
-        pointerY > rect.bottom
-      ) return;
-
+      if (pointerX < rect.left || pointerX > rect.right || pointerY < rect.top || pointerY > rect.bottom) return;
       const x = parseFloat(((pointerX - rect.left) / rect.width * 100).toFixed(2));
       const y = parseFloat(((pointerY - rect.top) / rect.height * 100).toFixed(2));
-
       await saveSignature(x, y);
       return;
     }
@@ -158,12 +155,10 @@ function DocumentView() {
       );
       setFinalizeMsg('PDF signed successfully!');
       setDownloadUrl(`http://localhost:5000${res.data.downloadUrl}`);
-      // Refresh doc status
       const docRes = await axios.get(`http://localhost:5000/api/docs/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setDoc(docRes.data.document);
-      // Refresh signatures
       const sigRes = await axios.get(`http://localhost:5000/api/signatures/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -173,6 +168,36 @@ function DocumentView() {
     } finally {
       setFinalizing(false);
     }
+  };
+
+  const handleSendSigningLink = async () => {
+    if (!signerEmail) {
+      setShareMsg('Signer email is required.');
+      return;
+    }
+    const token = localStorage.getItem('token');
+    setSendingLink(true);
+    setShareMsg('');
+    setGeneratedLink('');
+    try {
+      const res = await axios.post(
+        'http://localhost:5000/api/signing/generate',
+        { documentId: parseInt(id), signerEmail, signerName },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setGeneratedLink(res.data.signingUrl);
+      setShareMsg(res.data.message);
+    } catch (err) {
+      setShareMsg(err.response?.data?.message || 'Failed to generate signing link.');
+    } finally {
+      setSendingLink(false);
+    }
+  };
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(generatedLink);
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 2000);
   };
 
   const currentPageSignatures = signatures.filter((s) => s.page === currentPage);
@@ -204,27 +229,29 @@ function DocumentView() {
       </nav>
 
       <div className="max-w-5xl mx-auto mt-8 px-4">
-        {/* Document info */}
-        <div className="bg-white rounded-lg shadow p-5 mb-6 flex items-center justify-between">
+        {/* Document info bar */}
+        <div className="bg-white rounded-lg shadow p-5 mb-6 flex items-center justify-between flex-wrap gap-3">
           <div>
             <h2 className="text-lg font-bold text-gray-900">{doc.original_name}</h2>
             <p className="text-sm text-gray-500 mt-1">
               Size: {doc.file_size ? (doc.file_size / 1024).toFixed(1) + ' KB' : 'N/A'} &nbsp;•&nbsp;
-              Uploaded: {new Date(doc.created_at).toLocaleDateString('en-US', {
-                year: 'numeric', month: 'short', day: 'numeric',
-              })}
+              Uploaded: {new Date(doc.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
             </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-              doc.status === 'signed'
-                ? 'bg-green-100 text-green-700'
-                : doc.status === 'rejected'
-                ? 'bg-red-100 text-red-700'
-                : 'bg-yellow-100 text-yellow-700'
+              doc.status === 'signed' ? 'bg-green-100 text-green-700'
+              : doc.status === 'rejected' ? 'bg-red-100 text-red-700'
+              : 'bg-yellow-100 text-yellow-700'
             }`}>
               {doc.status.charAt(0).toUpperCase() + doc.status.slice(1)}
             </span>
+            <button
+              onClick={() => { setShowSharePanel((v) => !v); setShareMsg(''); setGeneratedLink(''); }}
+              className="bg-blue-100 text-blue-700 px-4 py-1.5 rounded-md text-sm font-medium hover:bg-blue-200 transition"
+            >
+              🔗 Share Signing Link
+            </button>
             {doc.status !== 'signed' && signatures.length > 0 && (
               <button
                 onClick={handleFinalize}
@@ -237,12 +264,67 @@ function DocumentView() {
           </div>
         </div>
 
+        {/* Share signing link panel */}
+        {showSharePanel && (
+          <div className="bg-white rounded-lg shadow p-5 mb-6 border border-blue-100">
+            <h3 className="text-sm font-semibold text-gray-800 mb-3">Send Signing Link</h3>
+            <div className="flex flex-col gap-3">
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <label className="block text-xs text-gray-500 mb-1">Signer Email *</label>
+                  <input
+                    type="email"
+                    value={signerEmail}
+                    onChange={(e) => setSignerEmail(e.target.value)}
+                    placeholder="signer@example.com"
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs text-gray-500 mb-1">Signer Name (optional)</label>
+                  <input
+                    type="text"
+                    value={signerName}
+                    onChange={(e) => setSignerName(e.target.value)}
+                    placeholder="John Doe"
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+              <div>
+                <button
+                  onClick={handleSendSigningLink}
+                  disabled={sendingLink}
+                  className="bg-blue-600 text-white px-5 py-2 rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition"
+                >
+                  {sendingLink ? 'Generating...' : '📧 Generate & Send Link'}
+                </button>
+              </div>
+              {shareMsg && (
+                <p className={`text-sm ${shareMsg.includes('Failed') ? 'text-red-600' : 'text-green-700'}`}>
+                  {shareMsg}
+                </p>
+              )}
+              {generatedLink && (
+                <div className="bg-gray-50 border rounded-md px-3 py-2 flex items-center justify-between gap-3">
+                  <span className="text-xs text-gray-600 truncate">{generatedLink}</span>
+                  <button
+                    onClick={handleCopyLink}
+                    className="text-xs bg-gray-200 hover:bg-gray-300 px-3 py-1 rounded transition flex-shrink-0"
+                  >
+                    {linkCopied ? '✅ Copied!' : '📋 Copy'}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Finalize feedback */}
         {finalizeMsg && (
           <div className={`text-sm px-4 py-3 rounded mb-4 flex items-center justify-between ${
             finalizeMsg.includes('Failed') || finalizeMsg.includes('No signatures')
-              ? 'bg-red-50 text-red-700'
-              : 'bg-green-50 text-green-700'
+              ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'
           }`}>
             <span>{finalizeMsg}</span>
             {downloadUrl && (
@@ -269,7 +351,6 @@ function DocumentView() {
         <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
           <div className="flex gap-4 items-start">
             <SignatureToolbar />
-
             <div className="flex-1">
               <div className="bg-white rounded-lg shadow p-4">
                 <div className="flex items-center justify-between mb-3">
@@ -283,19 +364,13 @@ function DocumentView() {
                   </p>
                   {numPages && (
                     <div className="flex items-center gap-3">
-                      <button
-                        onClick={goToPrevPage}
-                        disabled={currentPage <= 1}
-                        className="px-3 py-1 text-xs bg-gray-100 rounded hover:bg-gray-200 disabled:opacity-40 transition"
-                      >
+                      <button onClick={goToPrevPage} disabled={currentPage <= 1}
+                        className="px-3 py-1 text-xs bg-gray-100 rounded hover:bg-gray-200 disabled:opacity-40 transition">
                         ← Prev
                       </button>
                       <span className="text-xs text-gray-600">Page {currentPage} of {numPages}</span>
-                      <button
-                        onClick={goToNextPage}
-                        disabled={currentPage >= numPages}
-                        className="px-3 py-1 text-xs bg-gray-100 rounded hover:bg-gray-200 disabled:opacity-40 transition"
-                      >
+                      <button onClick={goToNextPage} disabled={currentPage >= numPages}
+                        className="px-3 py-1 text-xs bg-gray-100 rounded hover:bg-gray-200 disabled:opacity-40 transition">
                         Next →
                       </button>
                     </div>
@@ -313,23 +388,11 @@ function DocumentView() {
                     onLoadError={() => setError('Failed to render PDF preview.')}
                     loading={<p className="text-sm text-gray-500 p-10 text-center">Loading PDF...</p>}
                   >
-                    <Page
-                      pageNumber={currentPage}
-                      width={PAGE_WIDTH}
-                      renderAnnotationLayer={true}
-                      renderTextLayer={true}
-                    />
+                    <Page pageNumber={currentPage} width={PAGE_WIDTH} renderAnnotationLayer={true} renderTextLayer={true} />
                   </Document>
 
                   {currentPageSignatures.map((sig) => (
-                    <DraggableSignature
-                      key={sig.id}
-                      id={sig.id}
-                      x={sig.x}
-                      y={sig.y}
-                      signerName={sig.signer_name}
-                      status={sig.status}
-                    />
+                    <DraggableSignature key={sig.id} id={sig.id} x={sig.x} y={sig.y} signerName={sig.signer_name} status={sig.status} />
                   ))}
 
                   {isDropping && (
@@ -364,11 +427,9 @@ function DocumentView() {
                     <td className="px-3 py-2 text-gray-500">{sig.x}%, {sig.y}%</td>
                     <td className="px-3 py-2">
                       <span className={`px-2 py-0.5 rounded-full font-medium ${
-                        sig.status === 'signed'
-                          ? 'bg-green-100 text-green-700'
-                          : sig.status === 'rejected'
-                          ? 'bg-red-100 text-red-700'
-                          : 'bg-yellow-100 text-yellow-700'
+                        sig.status === 'signed' ? 'bg-green-100 text-green-700'
+                        : sig.status === 'rejected' ? 'bg-red-100 text-red-700'
+                        : 'bg-yellow-100 text-yellow-700'
                       }`}>
                         {sig.status.charAt(0).toUpperCase() + sig.status.slice(1)}
                       </span>

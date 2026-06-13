@@ -31,7 +31,7 @@ function DraggableSignature({ id, x, y, signerName, status }) {
           : 'bg-yellow-200 border-yellow-500 text-yellow-800'
       }`}
     >
-     {signerName || 'Signature'}
+    {signerName || 'Signature'}
     </div>
   );
 }
