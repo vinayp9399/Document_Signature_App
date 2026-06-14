@@ -11,10 +11,7 @@ function Dashboard() {
 
   useEffect(() => {
     const token = localStorage.getItem('token');
-    if (!token) {
-      navigate('/login');
-      return;
-    }
+    if (!token) { navigate('/login'); return; }
 
     const fetchDocuments = async () => {
       try {
@@ -23,11 +20,8 @@ function Dashboard() {
         });
         setDocuments(res.data.documents);
       } catch (err) {
-        if (err.response?.status === 401) {
-          navigate('/login');
-        } else {
-          setError('Failed to load documents.');
-        }
+        if (err.response?.status === 401) navigate('/login');
+        else setError('Failed to load documents.');
       } finally {
         setLoading(false);
       }
@@ -66,10 +60,7 @@ function Dashboard() {
           >
             + Upload PDF
           </Link>
-          <button
-            onClick={handleLogout}
-            className="text-sm text-red-500 hover:underline"
-          >
+          <button onClick={handleLogout} className="text-sm text-red-500 hover:underline">
             Logout
           </button>
         </div>
@@ -113,22 +104,20 @@ function Dashboard() {
                     <td className="px-6 py-4 text-gray-500">{formatSize(doc.file_size)}</td>
                     <td className="px-6 py-4">
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        doc.status === 'signed'
-                          ? 'bg-green-100 text-green-700'
-                          : doc.status === 'rejected'
-                          ? 'bg-red-100 text-red-700'
-                          : 'bg-yellow-100 text-yellow-700'
+                        doc.status === 'signed' ? 'bg-green-100 text-green-700'
+                        : doc.status === 'rejected' ? 'bg-red-100 text-red-700'
+                        : 'bg-yellow-100 text-yellow-700'
                       }`}>
                         {doc.status.charAt(0).toUpperCase() + doc.status.slice(1)}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-gray-500">{formatDate(doc.created_at)}</td>
-                    <td className="px-6 py-4">
-                      <Link
-                        to={`/docs/${doc.id}`}
-                        className="text-blue-600 hover:underline text-sm font-medium"
-                      >
+                    <td className="px-6 py-4 flex items-center gap-3">
+                      <Link to={`/docs/${doc.id}`} className="text-blue-600 hover:underline text-sm font-medium">
                         Preview
+                      </Link>
+                      <Link to={`/audit/${doc.id}`} className="text-gray-500 hover:underline text-sm">
+                        Audit
                       </Link>
                     </td>
                   </tr>

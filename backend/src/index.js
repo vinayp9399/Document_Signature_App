@@ -24,6 +24,7 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/docs', require('./routes/documents'));
 app.use('/api/signatures', require('./routes/signatures'));
 app.use('/api/signing', require('./routes/signingLinks'));
+app.use('/api/audit', require('./routes/audit'));
 
 app.use((err, req, res, next) => {
   console.error('Unhandled error:', err);

@@ -1,12 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const authMiddleware = require('../middleware/authMiddleware');
+const auditLogger = require('../middleware/auditMiddleware');
 const upload = require('../config/multer');
 const Document = require('../models/Document');
 
-router.post('/upload', authMiddleware, (req, res, next) => {
+router.post('/upload', authMiddleware, auditLogger('document_uploaded'), (req, res, next) => {
   upload.single('pdf')(req, res, (err) => {
-    if (err) return next(err); // Pass multer errors to global handler
+    if (err) return next(err);
     next();
   });
 }, async (req, res) => {
@@ -42,7 +43,7 @@ router.get('/', authMiddleware, async (req, res) => {
   }
 });
 
-router.get('/:id', authMiddleware, async (req, res) => {
+router.get('/:id', authMiddleware, auditLogger('document_viewed'), async (req, res) => {
   try {
     const doc = await Document.findById(req.params.id);
 

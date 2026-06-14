@@ -4,10 +4,11 @@ const path = require('path');
 const fs = require('fs');
 const { PDFDocument, rgb, StandardFonts } = require('pdf-lib');
 const authMiddleware = require('../middleware/authMiddleware');
+const auditLogger = require('../middleware/auditMiddleware');
 const Signature = require('../models/Signature');
 const Document = require('../models/Document');
 
-router.post('/', authMiddleware, async (req, res) => {
+router.post('/', authMiddleware, auditLogger('signature_placed'), async (req, res) => {
   try {
     const { documentId, x, y, page } = req.body;
 
@@ -41,6 +42,7 @@ router.post('/', authMiddleware, async (req, res) => {
   }
 });
 
+// GET /api/signatures/:documentId
 router.get('/:documentId', authMiddleware, async (req, res) => {
   try {
     const { documentId } = req.params;
@@ -61,7 +63,7 @@ router.get('/:documentId', authMiddleware, async (req, res) => {
   }
 });
 
-router.post('/finalize', authMiddleware, async (req, res) => {
+router.post('/finalize', authMiddleware, auditLogger('document_finalized'), async (req, res) => {
   try {
     const { documentId } = req.body;
 
@@ -82,7 +84,6 @@ router.post('/finalize', authMiddleware, async (req, res) => {
       return res.status(400).json({ message: 'No signatures found for this document' });
     }
 
-    // Read the original PDF from disk
     const uploadsDir = path.join(__dirname, '..', '..', 'uploads');
     const originalPath = path.join(uploadsDir, doc.file_path);
 
@@ -95,7 +96,6 @@ router.post('/finalize', authMiddleware, async (req, res) => {
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
     const pages = pdfDoc.getPages();
 
-    // Embed each signature onto its respective page
     for (const sig of signatures) {
       const pageIndex = (sig.page || 1) - 1;
       if (pageIndex < 0 || pageIndex >= pages.length) continue;
@@ -103,24 +103,14 @@ router.post('/finalize', authMiddleware, async (req, res) => {
       const pdfPage = pages[pageIndex];
       const { width, height } = pdfPage.getSize();
 
-      // Convert percentage coordinates to absolute PDF coordinates
-      // PDF origin is bottom-left, browser origin is top-left — flip Y axis
       const absX = (sig.x / 100) * width;
       const absY = height - (sig.y / 100) * height;
 
       const signerLabel = sig.signer_name || 'Signed';
       const signedAt = sig.signed_at
-        ? new Date(sig.signed_at).toLocaleDateString('en-US', {
-            year: 'numeric', month: 'short', day: 'numeric',
-          })
-        : new Date().toLocaleDateString('en-US', {
-            year: 'numeric', month: 'short', day: 'numeric',
-          });
+        ? new Date(sig.signed_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+        : new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 
-      const labelText = `✍ ${signerLabel}`;
-      const dateText = signedAt;
-
-      // Draw signature box background
       pdfPage.drawRectangle({
         x: absX - 2,
         y: absY - 28,
@@ -132,8 +122,7 @@ router.post('/finalize', authMiddleware, async (req, res) => {
         opacity: 0.9,
       });
 
-      // Draw signer name
-      pdfPage.drawText(labelText, {
+      pdfPage.drawText(`✍ ${signerLabel}`, {
         x: absX + 2,
         y: absY - 12,
         size: 10,
@@ -141,8 +130,7 @@ router.post('/finalize', authMiddleware, async (req, res) => {
         color: rgb(0.4, 0.3, 0),
       });
 
-      // Draw signed date
-      pdfPage.drawText(dateText, {
+      pdfPage.drawText(signedAt, {
         x: absX + 2,
         y: absY - 24,
         size: 8,
@@ -150,17 +138,14 @@ router.post('/finalize', authMiddleware, async (req, res) => {
         color: rgb(0.5, 0.4, 0.1),
       });
 
-      // Mark signature as signed
       await Signature.updateStatus(sig.id, 'signed');
     }
 
-    // Save the signed PDF with a new filename
     const signedFileName = `signed_${Date.now()}_${doc.file_path}`;
     const signedFilePath = path.join(uploadsDir, signedFileName);
     const signedPdfBytes = await pdfDoc.save();
     fs.writeFileSync(signedFilePath, signedPdfBytes);
 
-    // Update document status to signed
     await Document.updateStatus(documentId, 'signed');
 
     res.json({

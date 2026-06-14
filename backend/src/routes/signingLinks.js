@@ -2,12 +2,14 @@ const express = require('express');
 const router = express.Router();
 const crypto = require('crypto');
 const authMiddleware = require('../middleware/authMiddleware');
+const auditLogger = require('../middleware/auditMiddleware');
 const SignatureToken = require('../models/SignatureToken');
 const Signature = require('../models/Signature');
 const Document = require('../models/Document');
+const AuditLog = require('../models/AuditLog');
 const { sendSigningLink } = require('../config/mailer');
 
-router.post('/generate', authMiddleware, async (req, res) => {
+router.post('/generate', authMiddleware, auditLogger('signing_link_generated'), async (req, res) => {
   try {
     const { documentId, signerEmail, signerName } = req.body;
 
@@ -23,10 +25,7 @@ router.post('/generate', authMiddleware, async (req, res) => {
       return res.status(403).json({ message: 'Access denied' });
     }
 
-    // Generate a secure random token
     const token = crypto.randomBytes(48).toString('hex');
-
-    // Token expires in 48 hours
     const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000);
 
     const signingToken = await SignatureToken.create({
@@ -39,7 +38,6 @@ router.post('/generate', authMiddleware, async (req, res) => {
     const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
     const signingUrl = `${clientUrl}/sign/${token}`;
 
-    // Send email — if email config missing, skip and return link directly
     let emailSent = false;
     try {
       await sendSigningLink({
@@ -118,7 +116,6 @@ router.post('/sign/:token', async (req, res) => {
       return res.status(410).json({ message: 'This signing link has expired' });
     }
 
-    // Save signature using document owner's context (no auth required for public signing)
     const doc = await Document.findById(signingToken.document_id);
 
     const signature = await Signature.create({
@@ -129,8 +126,20 @@ router.post('/sign/:token', async (req, res) => {
       page: page || 1,
     });
 
-    // Mark token as used
     await SignatureToken.markUsed(token);
+
+    // Manual audit log for public signing (no auth middleware)
+    const ipAddress =
+      req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
+      req.socket?.remoteAddress ||
+      null;
+
+    await AuditLog.create({
+      documentId: signingToken.document_id,
+      userId: doc.user_id,
+      action: `document_signed_by_${signingToken.signer_email}`,
+      ipAddress,
+    });
 
     res.status(201).json({
       message: 'Document signed successfully',
