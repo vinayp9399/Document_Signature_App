@@ -8,6 +8,7 @@ import Upload from './pages/Upload';
 import DocumentView from './pages/DocumentView';
 import PublicSign from './pages/PublicSign';
 import AuditTrail from './pages/AuditTrail';
+import SignatureStatus from './pages/SignatureStatus';
 
 function App() {
   return (
@@ -21,6 +22,7 @@ function App() {
         <Route path="/docs/:id" element={<DocumentView />} />
         <Route path="/sign/:token" element={<PublicSign />} />
         <Route path="/audit/:id" element={<AuditTrail />} />
+        <Route path="/status/:id" element={<SignatureStatus />} />
       </Routes>
     </Router>
   );

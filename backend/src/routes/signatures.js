@@ -7,6 +7,7 @@ const authMiddleware = require('../middleware/authMiddleware');
 const auditLogger = require('../middleware/auditMiddleware');
 const Signature = require('../models/Signature');
 const Document = require('../models/Document');
+const AuditLog = require('../models/AuditLog');
 
 router.post('/', authMiddleware, auditLogger('signature_placed'), async (req, res) => {
   try {
@@ -32,17 +33,13 @@ router.post('/', authMiddleware, auditLogger('signature_placed'), async (req, re
       page: page || 1,
     });
 
-    res.status(201).json({
-      message: 'Signature position saved',
-      signature,
-    });
+    res.status(201).json({ message: 'Signature position saved', signature });
   } catch (err) {
     console.error('Save signature error:', err);
     res.status(500).json({ message: 'Server error saving signature' });
   }
 });
 
-// GET /api/signatures/:documentId
 router.get('/:documentId', authMiddleware, async (req, res) => {
   try {
     const { documentId } = req.params;
@@ -60,6 +57,70 @@ router.get('/:documentId', authMiddleware, async (req, res) => {
   } catch (err) {
     console.error('Get signatures error:', err);
     res.status(500).json({ message: 'Server error fetching signatures' });
+  }
+});
+
+router.patch('/:id/status', authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, reason } = req.body;
+
+    if (!status || !['signed', 'rejected', 'pending'].includes(status)) {
+      return res.status(400).json({ message: 'Status must be one of: pending, signed, rejected' });
+    }
+
+    const sig = await Signature.findById(id);
+    if (!sig) {
+      return res.status(404).json({ message: 'Signature not found' });
+    }
+
+    // Verify the document belongs to the logged-in user
+    const doc = await Document.findById(sig.document_id);
+    if (!doc) {
+      return res.status(404).json({ message: 'Document not found' });
+    }
+    if (doc.user_id !== req.userId) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    const updated = await Signature.updateStatus(id, status);
+
+    // Log the status change to audit trail
+    const ipAddress =
+      req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
+      req.socket?.remoteAddress ||
+      null;
+
+    const actionLabel = status === 'signed'
+      ? 'signature_accepted'
+      : status === 'rejected'
+      ? `signature_rejected${reason ? ': ' + reason : ''}`
+      : 'signature_reset_to_pending';
+
+    await AuditLog.create({
+      documentId: sig.document_id,
+      userId: req.userId,
+      action: actionLabel,
+      ipAddress,
+    });
+
+    // If all signatures on the document are signed, update document status too
+    const allSigs = await Signature.findByDocument(sig.document_id);
+    const allSigned = allSigs.length > 0 && allSigs.every((s) => s.status === 'signed');
+    const anyRejected = allSigs.some((s) => s.status === 'rejected');
+
+    if (allSigned) {
+      await Document.updateStatus(sig.document_id, 'signed');
+    } else if (anyRejected) {
+      await Document.updateStatus(sig.document_id, 'rejected');
+    } else {
+      await Document.updateStatus(sig.document_id, 'pending');
+    }
+
+    res.json({ message: `Signature ${status}`, signature: updated });
+  } catch (err) {
+    console.error('Update signature status error:', err);
+    res.status(500).json({ message: 'Server error updating signature status' });
   }
 });
 
@@ -97,12 +158,13 @@ router.post('/finalize', authMiddleware, auditLogger('document_finalized'), asyn
     const pages = pdfDoc.getPages();
 
     for (const sig of signatures) {
+      if (sig.status === 'rejected') continue;
+
       const pageIndex = (sig.page || 1) - 1;
       if (pageIndex < 0 || pageIndex >= pages.length) continue;
 
       const pdfPage = pages[pageIndex];
       const { width, height } = pdfPage.getSize();
-
       const absX = (sig.x / 100) * width;
       const absY = height - (sig.y / 100) * height;
 
@@ -112,30 +174,15 @@ router.post('/finalize', authMiddleware, auditLogger('document_finalized'), asyn
         : new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 
       pdfPage.drawRectangle({
-        x: absX - 2,
-        y: absY - 28,
-        width: 160,
-        height: 36,
-        color: rgb(1, 0.98, 0.8),
-        borderColor: rgb(0.85, 0.65, 0),
-        borderWidth: 1,
-        opacity: 0.9,
+        x: absX - 2, y: absY - 28, width: 160, height: 36,
+        color: rgb(1, 0.98, 0.8), borderColor: rgb(0.85, 0.65, 0),
+        borderWidth: 1, opacity: 0.9,
       });
-
-      pdfPage.drawText(`✍ ${signerLabel}`, {
-        x: absX + 2,
-        y: absY - 12,
-        size: 10,
-        font,
-        color: rgb(0.4, 0.3, 0),
+      pdfPage.drawText(`Signed: ${signerLabel}`, {
+        x: absX + 2, y: absY - 12, size: 10, font, color: rgb(0.4, 0.3, 0),
       });
-
       pdfPage.drawText(signedAt, {
-        x: absX + 2,
-        y: absY - 24,
-        size: 8,
-        font,
-        color: rgb(0.5, 0.4, 0.1),
+        x: absX + 2, y: absY - 24, size: 8, font, color: rgb(0.5, 0.4, 0.1),
       });
 
       await Signature.updateStatus(sig.id, 'signed');
