@@ -34,8 +34,16 @@ function Home() {
         </div>
       </nav>
 
-      {/* Hero */}
-      <div className="flex-1 flex flex-col items-center justify-center px-4 text-center py-20">
+      {/* Hero with background image */}
+      <div
+        className="relative flex-1 flex flex-col items-center justify-center px-4 text-center py-20"
+        style={{
+          backgroundImage:
+            "linear-gradient(to bottom, rgba(249,250,251,0.93), rgba(249,250,251,0.96)), url('https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&w=1600&q=80')",
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+        }}
+      >
         <div className="text-6xl mb-6">📄</div>
         <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
           Sign Documents <span className="text-blue-600">Digitally</span>
@@ -77,7 +85,7 @@ function Home() {
         )}
 
         {/* Feature highlights */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-20 max-w-3xl w-full text-left">
+        <div className="relative grid grid-cols-1 md:grid-cols-3 gap-6 mt-20 max-w-3xl w-full text-left">
           {[
             { icon: '🔒', title: 'Secure Auth', desc: 'JWT-based authentication with protected document access.' },
             { icon: '✍️', title: 'Drag & Drop Signing', desc: 'Place signature fields anywhere on the PDF with ease.' },
