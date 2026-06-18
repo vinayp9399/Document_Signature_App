@@ -154,7 +154,7 @@ function DocumentView() {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setFinalizeMsg('PDF signed successfully!');
-      setDownloadUrl(`http://localhost:5000${res.data.downloadUrl}`);
+      setDownloadUrl(`https://document-signature-app-80xa.onrender.com${res.data.downloadUrl}`);
       const docRes = await axios.get(`https://document-signature-app-80xa.onrender.com/api/docs/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
