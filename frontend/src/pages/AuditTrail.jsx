@@ -36,10 +36,10 @@ function AuditTrail() {
     const fetchData = async () => {
       try {
         const [auditRes, docRes] = await Promise.all([
-          axios.get(`http://localhost:5000/api/audit/${id}`, {
+          axios.get(`https://document-signature-app-80xa.onrender.com/api/audit/${id}`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
-          axios.get(`http://localhost:5000/api/docs/${id}`, {
+          axios.get(`https://document-signature-app-80xa.onrender.com/api/docs/${id}`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
         ]);

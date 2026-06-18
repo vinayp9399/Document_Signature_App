@@ -27,7 +27,7 @@ function PublicSign() {
   useEffect(() => {
     const verifyToken = async () => {
       try {
-        const res = await axios.get(`http://localhost:5000/api/signing/verify/${token}`);
+        const res = await axios.get(`https://document-signature-app-80xa.onrender.com/api/signing/verify/${token}`);
         setTokenData(res.data);
       } catch (err) {
         if (err.response?.status === 410) {
@@ -66,7 +66,7 @@ function PublicSign() {
     setSubmitting(true);
     setSubmitMsg('');
     try {
-      await axios.post(`http://localhost:5000/api/signing/sign/${token}`, {
+      await axios.post(`https://document-signature-app-80xa.onrender.com/api/signing/sign/${token}`, {
         x: pendingSignature.x,
         y: pendingSignature.y,
         page: pendingSignature.page,
@@ -109,7 +109,7 @@ function PublicSign() {
     );
   }
 
-  const pdfUrl = `http://localhost:5000/uploads/${tokenData.filePath}`;
+  const pdfUrl = `https://document-signature-app-80xa.onrender.com/uploads/${tokenData.filePath}`;
 
   return (
     <div className="min-h-screen bg-gray-50">

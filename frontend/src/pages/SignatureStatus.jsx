@@ -21,10 +21,10 @@ function SignatureStatus() {
     const fetchData = async () => {
       try {
         const [docRes, sigRes] = await Promise.all([
-          axios.get(`http://localhost:5000/api/docs/${id}`, {
+          axios.get(`https://document-signature-app-80xa.onrender.com/api/docs/${id}`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
-          axios.get(`http://localhost:5000/api/signatures/${id}`, {
+          axios.get(`https://document-signature-app-80xa.onrender.com/api/signatures/${id}`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
         ]);
@@ -52,7 +52,7 @@ function SignatureStatus() {
 
     try {
       const res = await axios.patch(
-        `http://localhost:5000/api/signatures/${sigId}/status`,
+        `https://document-signature-app-80xa.onrender.com/api/signatures/${sigId}/status`,
         { status, reason },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -62,7 +62,7 @@ function SignatureStatus() {
       );
 
       // Refresh document status
-      const docRes = await axios.get(`http://localhost:5000/api/docs/${id}`, {
+      const docRes = await axios.get(`https://document-signature-app-80xa.onrender.com/api/docs/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setDoc(docRes.data.document);

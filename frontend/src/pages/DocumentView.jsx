@@ -53,7 +53,7 @@ function DocumentView() {
 
     const fetchDocument = async () => {
       try {
-        const res = await axios.get(`http://localhost:5000/api/docs/${id}`, {
+        const res = await axios.get(`https://document-signature-app-80xa.onrender.com/api/docs/${id}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         setDoc(res.data.document);
@@ -76,7 +76,7 @@ function DocumentView() {
 
     const fetchSignatures = async () => {
       try {
-        const res = await axios.get(`http://localhost:5000/api/signatures/${id}`, {
+        const res = await axios.get(`https://document-signature-app-80xa.onrender.com/api/signatures/${id}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         setSignatures(res.data.signatures);
@@ -129,7 +129,7 @@ function DocumentView() {
     setSigMsg('');
     try {
       const res = await axios.post(
-        'http://localhost:5000/api/signatures',
+        'https://document-signature-app-80xa.onrender.com/api/signatures',
         { documentId: parseInt(id), x, y, page: currentPage },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -149,17 +149,17 @@ function DocumentView() {
     setDownloadUrl('');
     try {
       const res = await axios.post(
-        'http://localhost:5000/api/signatures/finalize',
+        'https://document-signature-app-80xa.onrender.com/api/signatures/finalize',
         { documentId: parseInt(id) },
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setFinalizeMsg('PDF signed successfully!');
       setDownloadUrl(`http://localhost:5000${res.data.downloadUrl}`);
-      const docRes = await axios.get(`http://localhost:5000/api/docs/${id}`, {
+      const docRes = await axios.get(`https://document-signature-app-80xa.onrender.com/api/docs/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setDoc(docRes.data.document);
-      const sigRes = await axios.get(`http://localhost:5000/api/signatures/${id}`, {
+      const sigRes = await axios.get(`https://document-signature-app-80xa.onrender.com/api/signatures/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setSignatures(sigRes.data.signatures);
@@ -181,7 +181,7 @@ function DocumentView() {
     setGeneratedLink('');
     try {
       const res = await axios.post(
-        'http://localhost:5000/api/signing/generate',
+        'https://document-signature-app-80xa.onrender.com/api/signing/generate',
         { documentId: parseInt(id), signerEmail, signerName },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -219,7 +219,7 @@ function DocumentView() {
     );
   }
 
-  const pdfUrl = `http://localhost:5000/uploads/${doc.file_path}`;
+  const pdfUrl = `https://document-signature-app-80xa.onrender.com/uploads/${doc.file_path}`;
 
   return (
     <div className="min-h-screen bg-gray-50">

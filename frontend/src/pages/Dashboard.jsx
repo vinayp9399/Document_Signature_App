@@ -19,7 +19,7 @@ function Dashboard() {
 
     const fetchDocuments = async () => {
       try {
-        const res = await axios.get('http://localhost:5000/api/docs/', {
+        const res = await axios.get('https://document-signature-app-80xa.onrender.com/api/docs/', {
           headers: { Authorization: `Bearer ${token}` },
         });
         setDocuments(res.data.documents);

@@ -13,7 +13,7 @@ function Register() {
     setServerError('');
     setLoading(true);
     try {
-      const res = await axios.post('http://localhost:5000/api/auth/register', data);
+      const res = await axios.post('https://document-signature-app-80xa.onrender.com/api/auth/register', data);
       localStorage.setItem('token', res.data.token);
       localStorage.setItem('refreshToken', res.data.refreshToken);
       localStorage.setItem('user', JSON.stringify(res.data.user));

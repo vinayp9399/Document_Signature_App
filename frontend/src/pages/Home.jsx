@@ -39,7 +39,7 @@ function Home() {
         className="relative flex-1 flex flex-col items-center justify-center px-4 text-center py-20"
         style={{
           backgroundImage:
-            "linear-gradient(to bottom, rgba(249,250,251,0.93), rgba(249,250,251,0.96)), url('https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&w=1600&q=80')",
+            "linear-gradient(to bottom, rgba(249,250,251,0.73), rgba(249,250,251,0.76)), url('https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&w=1600&q=80')",
           backgroundSize: 'cover',
           backgroundPosition: 'center',
         }}
@@ -48,7 +48,7 @@ function Home() {
         <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
           Sign Documents <span className="text-blue-600">Digitally</span>
         </h1>
-        <p className="text-lg text-gray-500 max-w-xl mb-10">
+        <p className="text-lg text-black max-w-xl mb-10">
           Upload PDFs, place signature fields, share signing links, and generate legally traceable signed documents — all in one place.
         </p>
 
