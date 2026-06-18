@@ -32,15 +32,15 @@ const Signature = {
   },
 
   async updateStatus(id, status) {
-    const result = await pool.query(
-      `UPDATE signatures
-       SET status = $1, signed_at = CASE WHEN $1 = 'signed' THEN NOW() ELSE signed_at END
-       WHERE id = $2
-       RETURNING *`,
-      [status, id]
-    );
-    return result.rows[0] || null;
-  },
+  const result = await pool.query(
+    `UPDATE signatures
+     SET status = $1, signed_at = CASE WHEN $2::text = 'signed' THEN NOW() ELSE signed_at END
+     WHERE id = $3
+     RETURNING *`,
+    [status, status, id]
+  );
+  return result.rows[0] || null;
+},
 };
 
 module.exports = Signature;
