@@ -1,6 +1,6 @@
 # 📄 DocSign — Document Signature App
 
-A secure, full-stack digital signature platform that enables users to upload documents, place digital signatures, share signing links, and generate legally traceable signed PDFs — built as a 14-day structured project using the MERN-style stack (PostgreSQL instead of MongoDB).
+A secure, full-stack digital signature platform that enables users to upload documents, place digital signatures, share signing links, and generate legally traceable signed PDFs using the MERN stack with (PostgreSQL).
 
 Live Link: https://document-signature-app-alpha.vercel.app/
 
@@ -137,6 +137,6 @@ flowchart TD
 
 ## ✅ Conclusion
 
-The Document Signature App demonstrates that a project doesn't need to be a "simple CRUD app" to be an effective learning and portfolio tool. By modeling a real DocuSign-style workflow — secure authentication, file handling, coordinate-based signature placement, tokenized external access, immutable PDF generation, and full audit logging — this project covers the same architectural concerns found in production SaaS systems across LegalTech, HR tech, and FinTech.
+The Document Signature App by modeling a real DocuSign-style workflow — secure authentication, file handling, coordinate-based signature placement, tokenized external access, immutable PDF generation, and full audit logging — this project covers the same architectural concerns found in production SaaS systems across LegalTech, HR tech, and FinTech.
 
-Built incrementally over a structured 14-day plan, it shows not just the ability to write code, but the ability to **reason about document lifecycles, security boundaries, and compliance-driven features** — the kind of product-aware engineering that stands out in real interviews and real teams.
+Built incrementally over a structured 14-day plan, it shows not just the ability to write code, but the ability to **reason about document lifecycles, security boundaries, and compliance-driven features** — the kind of product-aware engineering.
